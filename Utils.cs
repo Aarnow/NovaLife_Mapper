@@ -91,5 +91,10 @@ namespace Mapper
                 return false;
             }
         }
+
+        public static int GetAreaObjectsCount(LifeArea lifeArea)
+        {
+            return lifeArea.instance.objects.Count + lifeArea.instance.spawnedObjects.Count;
+        }
     }
 }
