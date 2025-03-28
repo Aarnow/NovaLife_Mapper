@@ -99,7 +99,7 @@ namespace Mapper
 
             //Corps
             panel.AddTabLine($"{mk.Color("Numéro du terrain", mk.Colors.Warning)}: {lifeArea.areaId}", _ => {});
-            panel.AddTabLine($"{mk.Color("Nombre d'objets", mk.Colors.Warning)}: {lifeArea.instance.objects.Count}", _ => {});
+            panel.AddTabLine($"{mk.Color("Nombre d'objets", mk.Colors.Warning)}: {Utils.GetAreaObjectsCount(lifeArea)}", _ => {});
 
             panel.NextButton("Vider", () => ClearAreaPanel(player, lifeArea.areaId));
             panel.NextButton("Voir les sauvegardes", () => ShowLoadableAreasPanel(player, lifeArea.areaId));
@@ -380,13 +380,13 @@ namespace Mapper
 
                 panel.AddButton("Import", async _ =>
                 {
-                    string path = ConfigDirectoryPath + "/" + jsonFiles[panel.selectedTab] + ".json";
+                    string path = ConfigDirectoryPath + "/" + filesToImport[panel.selectedTab] + ".json";
                     if (File.Exists(path))
                     {
                         string jsonContent = File.ReadAllText(path);
                         MapConfig mapConfig = JsonConvert.DeserializeObject<MapConfig>(jsonContent);
                         mapConfig.DeserializeObjects();
-                        mapConfig.Source = jsonFiles[panel.selectedTab];
+                        mapConfig.Source = filesToImport[panel.selectedTab];
 
                         if (await mapConfig.Save()) player.Notify("Mapper", $"La décoration \"{mapConfig.Name}\" à bien été importée !", NotificationManager.Type.Success);
                         else player.Notify("Mapper", $"Échec de l'importation", NotificationManager.Type.Error);
