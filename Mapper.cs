@@ -1,5 +1,6 @@
 ﻿using Life;
 using Life.AreaSystem;
+using Life.DB;
 using Life.Network;
 using Life.UI;
 using Mapper.Entities;
@@ -123,12 +124,7 @@ namespace Mapper
             panel.PreviousButton();
             panel.PreviousButtonWithAction("Confirmer", async () =>
             {
-                foreach (LifeObject i in lifeArea.instance.objects.Values.ToList())
-                {
-                    NetworkAreaHelper.RemoveObject(i.areaId, i.id);
-                }
-
-                if (lifeArea.instance.objects.Count == 0)
+                if (Utils.ClearArea(lifeArea, this))
                 {
                     player.Notify("Mapper", $"Terrain n°{lifeArea.areaId} vidé !", NotificationManager.Type.Success);
                     return await Task.FromResult(true);
@@ -245,6 +241,8 @@ namespace Mapper
         }
         public void LoadAreaPanel(Player player, MapConfig mapConfig)
         {
+            LifeArea lifeArea = Nova.a.GetAreaById((uint)mapConfig.AreaId);
+
             //Déclaration
             Panel panel = PanelHelper.Create($"Mapper - Terrain \"{mapConfig.Name}\"", UIPanel.PanelType.Text, player, () => LoadAreaPanel(player, mapConfig));
 
@@ -255,14 +253,18 @@ namespace Mapper
 
             panel.AddButton("Téléportation", _ =>
             {
-                LifeArea area = Nova.a.GetAreaById((uint)mapConfig.AreaId);
-                player.setup.TargetSetPosition(area.instance.spawn);
+                player.setup.TargetSetPosition(lifeArea.instance.spawn);
                 panel.Refresh();
             });
             panel.AddButton("Supprimer", _ => DeleteAreaPanel(player, mapConfig));
             panel.PreviousButtonWithAction("Charger", async () =>
             {
-                Utils.ClearArea((uint)mapConfig.AreaId, this);
+                if(!Utils.ClearArea(lifeArea, this))
+                {
+                    player.Notify("Mapper", $"Erreur lors du nettoyage du terrain !", NotificationManager.Type.Error);
+                    return await Task.FromResult(false);
+                }
+
                 mapConfig.DeserializeObjects();
 
                 if (mapConfig.ListOfLifeObject != null && mapConfig.ListOfLifeObject.Count > 0)
