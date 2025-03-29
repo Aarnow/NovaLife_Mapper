@@ -225,7 +225,7 @@ namespace Mapper
             {
                 foreach (MapConfig mapConfig in mapConfigs)
                 {
-                    panel.AddTabLine($"{mapConfig.Name} - {mapConfig.Author}", _ => { });
+                    panel.AddTabLine($"{(mapConfig.MapId != Nova.mapId ? $"{mk.Color($"{mk.Italic("[incompatible]")}", mk.Colors.Error)}" : $"")} {mapConfig.Name} - {mapConfig.Author}", _ => { });
                 }
 
                 panel.NextButton("Exporter", () => ExportAreaPanel(player, mapConfigs[panel.selectedTab]));
