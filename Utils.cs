@@ -52,6 +52,11 @@ namespace Mapper
                 mapConfig.ListOfLifeObject.Add(i);
             }
 
+            foreach (LifeObject i in lifeArea.instance.spawnedObjects.Values)
+            {
+                mapConfig.ListOfLifeObject.Add(i);
+            }
+
             mapConfig.SerializeObjects();
 
             return mapConfig;
@@ -109,17 +114,12 @@ namespace Mapper
         {
             try
             {
-                // Parse the JSON string into a JObject
                 JObject jsonObject = JsonConvert.DeserializeObject<JObject>(json);
-
-                // Access the modelId value
                 int modelId = jsonObject["modelId"].Value<int>();
-
                 return modelId;
             }
             catch
             {
-                // Return 0 if any error occurs
                 return 0;
             }
         }
