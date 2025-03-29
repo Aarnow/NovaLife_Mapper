@@ -273,7 +273,8 @@ namespace Mapper
                     {
                         var position = new Vector3(i.x, i.y, i.z);
                         Quaternion rotation = Utils.EulerToQuaternion(i.rotX, i.rotY, i.rotZ);
-                        NetworkAreaHelper.PlaceObject(i.areaId, i.objectId, i.objectId, position, rotation, i.isInterior, i.steamId, i.data);
+                        int modelId = Utils.GetModelId(i.objectVersion);
+                        NetworkAreaHelper.PlaceObject(i.areaId, i.objectId, modelId, position, rotation, i.isInterior, i.steamId, i.data);
                     }
                 }
 
