@@ -246,19 +246,33 @@ namespace Mapper
             Panel panel = PanelHelper.Create($"Mapper - Terrain \"{mapConfig.Name}\"", UIPanel.PanelType.Text, player, () => LoadAreaPanel(player, mapConfig));
 
             //Corps
-            panel.TextLines.Add($"Voulez-vous charger ce terrain ?");
-            panel.TextLines.Add($"Attention, la décoration actuelle du terrain n°{mapConfig.AreaId} sera remplacée.");
-            panel.TextLines.Add($"Nombre d'objets: {mapConfig.ObjectCount}");
+            panel.TextLines.Add($"{mk.Size("Comment voulez-vous charger ce terrain ?", 18)}");
+            panel.TextLines.Add($"{mk.Size($"{mk.Color("Nombre d'objets :", mk.Colors.Purple)} {mapConfig.ObjectCount}", 18)}");
+            panel.TextLines.Add($"");
+            panel.TextLines.Add($"{mk.Size($"{mk.Align("   • Ajouter la décoration au terrain sans affecter l'existant.", mk.Aligns.Left)}", 14)}");
+            panel.TextLines.Add($"{mk.Size($"{mk.Align("   • Remplacer la décoration actuelle du terrain", mk.Aligns.Left)}", 14)}");
 
-            panel.AddButton("Téléportation", _ =>
+            panel.PreviousButtonWithAction("Ajouter", async () =>
             {
-                player.setup.TargetSetPosition(lifeArea.instance.spawn);
-                panel.Refresh();
+                mapConfig.DeserializeObjects();
+
+                if (mapConfig.ListOfLifeObject != null && mapConfig.ListOfLifeObject.Count > 0)
+                {
+                    foreach (LifeObject i in mapConfig.ListOfLifeObject)
+                    {
+                        var position = new Vector3(i.x, i.y, i.z);
+                        Quaternion rotation = Utils.EulerToQuaternion(i.rotX, i.rotY, i.rotZ);
+                        int modelId = Utils.GetModelId(i.objectVersion);
+                        NetworkAreaHelper.PlaceObject(i.areaId, i.objectId, modelId, position, rotation, i.isInterior, i.steamId, i.data);
+                    }
+                }
+
+                player.Notify("Mapper", $"La décoration \"{mapConfig.Name}\" est chargée !", NotificationManager.Type.Success);
+                return await Task.FromResult(true);
             });
-            panel.AddButton("Supprimer", _ => DeleteAreaPanel(player, mapConfig));
-            panel.PreviousButtonWithAction("Charger", async () =>
+            panel.PreviousButtonWithAction("Remplacer", async () =>
             {
-                if(!Utils.ClearArea(lifeArea, this))
+                if (!Utils.ClearArea(lifeArea, this))
                 {
                     player.Notify("Mapper", $"Erreur lors du nettoyage du terrain !", NotificationManager.Type.Error);
                     return await Task.FromResult(false);
@@ -281,6 +295,13 @@ namespace Mapper
                 return await Task.FromResult(true);
             });
 
+            panel.AddButton("Téléportation", _ =>
+            {
+                player.setup.TargetSetPosition(lifeArea.instance.spawn);
+                panel.Refresh();
+            });
+            panel.AddButton("Supprimer", _ => DeleteAreaPanel(player, mapConfig));
+
             panel.PreviousButton();
             panel.CloseButton();
 
@@ -291,7 +312,7 @@ namespace Mapper
         public void DeleteAreaPanel(Player player, MapConfig mapConfig)
         {
             //Déclaration
-            Panel panel = PanelHelper.Create($"Mapper - Supprimer le terrain \"{mapConfig.Name}\"", UIPanel.PanelType.Text, player, () => DeleteAreaPanel(player, mapConfig));
+            Panel panel = PanelHelper.Create($"Mapper - Supprimer la sauvegarde \"{mapConfig.Name}\"", UIPanel.PanelType.Text, player, () => DeleteAreaPanel(player, mapConfig));
 
             //Corps
             panel.TextLines.Add($"Voulez-vous vraiment supprimer cette sauvegarde ?");
