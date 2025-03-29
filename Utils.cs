@@ -7,6 +7,7 @@ using System.Text.RegularExpressions;
 using UnityEngine;
 using Life.Network;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace Mapper
 {
@@ -95,6 +96,25 @@ namespace Mapper
         public static int GetAreaObjectsCount(LifeArea lifeArea)
         {
             return lifeArea.instance.objects.Count + lifeArea.instance.spawnedObjects.Count;
+        }
+
+        public static int GetModelId(string json)
+        {
+            try
+            {
+                // Parse the JSON string into a JObject
+                JObject jsonObject = JsonConvert.DeserializeObject<JObject>(json);
+
+                // Access the modelId value
+                int modelId = jsonObject["modelId"].Value<int>();
+
+                return modelId;
+            }
+            catch
+            {
+                // Return 0 if any error occurs
+                return 0;
+            }
         }
     }
 }
