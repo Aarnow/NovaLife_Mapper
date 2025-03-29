@@ -14,6 +14,7 @@ namespace Mapper.Entities
         public int CreatedAt { get; set; }
         public int ObjectCount { get; set; }
         public string Source { get; set; }
+        public int MapId { get; set; }
 
         public string Objects { get; set; }
         [Ignore]

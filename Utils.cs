@@ -44,7 +44,8 @@ namespace Mapper
 
             mapConfig.CreatedAt = DateUtils.GetNumericalDateOfTheDay();
             mapConfig.AreaId = (int)player.setup.areaId;
-            mapConfig.ObjectCount = lifeArea.instance.objects.Count;
+            mapConfig.ObjectCount = GetAreaObjectsCount(lifeArea);
+            mapConfig.MapId = Nova.mapId;
             mapConfig.Source = "local";
 
             foreach (LifeObject i in lifeArea.instance.objects.Values)
