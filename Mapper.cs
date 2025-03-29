@@ -1,6 +1,5 @@
 ﻿using Life;
 using Life.AreaSystem;
-using Life.DB;
 using Life.Network;
 using Life.UI;
 using Mapper.Entities;
