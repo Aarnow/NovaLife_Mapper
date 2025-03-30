@@ -44,7 +44,7 @@ namespace Mapper
             _menu.AddAdminPluginTabLine(PluginInformations, 1, "Mapper", (ui) =>
             {
                 Player player = PanelHelper.ReturnPlayerFromPanel(ui);
-                MapperPanel(player, false);
+                MapperPanel(player, true);
             }, 0);
         }
         private void GenerateDirectory()
@@ -64,21 +64,20 @@ namespace Mapper
         {
             new SChatCommand("/mapper", new string[] { "/map" }, "Permet d'ouvrir le panel du plugin \"Mapper\"", "/mapper", (player, arg) =>
             {
-                if(player.IsAdmin) MapperPanel(player, true);
+                if(player.IsAdmin) MapperPanel(player);
                 else player.Notify("Mapper", "Vous n'avez pas la permission requise.", NotificationManager.Type.Warning);
             }).Register();      
         }
 
-        public void MapperPanel(Player player, bool isCmd)
+        public void MapperPanel(Player player, bool isCmd = false)
         {
             //Déclaration
             Panel panel = PanelHelper.Create("Mapper", UIPanel.PanelType.TabPrice, player, () => MapperPanel(player, isCmd));
 
             //Corps
-            panel.AddTabLine($"{mk.Color("Terrain actuel", mk.Colors.Info)}", _ => CheckAreaPanel(player));
-            panel.AddTabLine($"{mk.Color("Terrain enregistrés", mk.Colors.Info)}", _ => ShowLoadableAreasPanel(player));
-            panel.AddTabLine($"{mk.Color("Importer", mk.Colors.Info)}", _ => ImportAreaPanel(player));
-            panel.AddTabLine($"{mk.Color("Sauvegarder", mk.Colors.Info)}", _ => InitSaveAreaPanel(player));
+            panel.AddTabLine($"{mk.Color("Terrain actuel", mk.Colors.Verbose)}", _ => CheckAreaPanel(player));
+            panel.AddTabLine($"{mk.Color("Vos sauvegardes", mk.Colors.Verbose)}", _ => ShowLoadableAreasPanel(player));
+            panel.AddTabLine($"{mk.Color("Importer une sauvegarde", mk.Colors.Warning)}", _ => ImportAreaPanel(player));
 
             if (isCmd) panel.AddButton("Retour", _ => AAMenu.AAMenu.menu.AdminPluginPanel(player));
             panel.NextButton("Sélectionner", () => panel.SelectTab());
@@ -101,8 +100,12 @@ namespace Mapper
             panel.AddTabLine($"{mk.Color("Numéro du terrain", mk.Colors.Warning)}: {lifeArea.areaId}", _ => {});
             panel.AddTabLine($"{mk.Color("Nombre d'objets", mk.Colors.Warning)}: {Utils.GetAreaObjectsCount(lifeArea)}", _ => {});
 
-            panel.NextButton("Vider", () => ClearAreaPanel(player, lifeArea.areaId));
-            panel.NextButton("Voir les sauvegardes", () => ShowLoadableAreasPanel(player, lifeArea.areaId));
+            panel.NextButton($"{mk.Size($"{mk.Color("sauvegarder", mk.Colors.Info)}", 16)}", () => InitSaveAreaPanel(player));
+            panel.NextButton($"{mk.Size($"{mk.Color("Vos sauvegardes", mk.Colors.Success)}", 16)}", () => ShowLoadableAreasPanel(player, lifeArea.areaId));
+            
+            panel.NextButton($"{mk.Size($"{mk.Color("Vider", mk.Colors.Orange)}", 16)}", () => ClearAreaPanel(player, lifeArea.areaId));
+            panel.AddButton($"{mk.Size($"{mk.Color("prochaine fonctionnalité...", mk.Colors.Grey)}", 12)}", _ => {});
+
             panel.PreviousButton();
             panel.CloseButton();
 
@@ -117,8 +120,10 @@ namespace Mapper
             Panel panel = PanelHelper.Create($"Mapper - Vider le terrain n°{player.setup.areaId}", UIPanel.PanelType.Text, player, () => ClearAreaPanel(player, areaId));
 
             //Corps
-            panel.TextLines.Add("Êtes-vous sûr de vouloir vider ce terrain ?");
-            panel.TextLines.Add("L'ensemble des objets seront supprimés.");
+            panel.TextLines.Add($"{mk.Size("Êtes-vous sûr de vouloir vider ce terrain ?", 18)}");
+            panel.TextLines.Add("");
+            panel.TextLines.Add($"{mk.Size(mk.Color(mk.Bold("ATTENTION"), mk.Colors.Error), 18)}");
+            panel.TextLines.Add($"{mk.Size(mk.Color("L'ensemble des objets seront supprimés.", mk.Colors.Error), 18)}");
 
             panel.PreviousButton();
             panel.PreviousButtonWithAction("Confirmer", async () =>
