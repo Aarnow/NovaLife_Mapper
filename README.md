@@ -25,4 +25,4 @@ Vous pouvez consulter le texte complet de la licence dans le fichier LICENSE.
 Vous pouvez retrouver [la dernière release](https://github.com/Aarnow/NovaLife_Mapper/releases/latest) de ce projet ainsi qu'un [wiki](https://github.com/Aarnow/NovaLife_Mapper/wiki)
 
 ### 🚀 Contribution
-Si vous souhaitez contribuer, veuillez ouvrir une issue ou soumettre une pull request. Assurez-vous de respecter les directives de contribution.
+Si vous souhaitez contribuer, veuillez ouvrir une issue ou soumettre une pull request.
