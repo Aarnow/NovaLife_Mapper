@@ -44,7 +44,7 @@ namespace Mapper
             _menu.AddAdminPluginTabLine(PluginInformations, 1, "Mapper", (ui) =>
             {
                 Player player = PanelHelper.ReturnPlayerFromPanel(ui);
-                MapperPanel(player, false);
+                MapperPanel(player, true);
             }, 0);
         }
         private void GenerateDirectory()
@@ -64,21 +64,20 @@ namespace Mapper
         {
             new SChatCommand("/mapper", new string[] { "/map" }, "Permet d'ouvrir le panel du plugin \"Mapper\"", "/mapper", (player, arg) =>
             {
-                if(player.IsAdmin) MapperPanel(player, true);
+                if(player.IsAdmin) MapperPanel(player);
                 else player.Notify("Mapper", "Vous n'avez pas la permission requise.", NotificationManager.Type.Warning);
             }).Register();      
         }
 
-        public void MapperPanel(Player player, bool isCmd)
+        public void MapperPanel(Player player, bool isCmd = false)
         {
             //Déclaration
             Panel panel = PanelHelper.Create("Mapper", UIPanel.PanelType.TabPrice, player, () => MapperPanel(player, isCmd));
 
             //Corps
-            panel.AddTabLine($"{mk.Color("Terrain actuel", mk.Colors.Info)}", _ => CheckAreaPanel(player));
-            panel.AddTabLine($"{mk.Color("Terrain enregistrés", mk.Colors.Info)}", _ => ShowLoadableAreasPanel(player));
-            panel.AddTabLine($"{mk.Color("Importer", mk.Colors.Info)}", _ => ImportAreaPanel(player));
-            panel.AddTabLine($"{mk.Color("Sauvegarder", mk.Colors.Info)}", _ => InitSaveAreaPanel(player));
+            panel.AddTabLine($"{mk.Color("Terrain actuel", mk.Colors.Verbose)}", _ => CheckAreaPanel(player));
+            panel.AddTabLine($"{mk.Color("Vos sauvegardes", mk.Colors.Verbose)}", _ => ShowLoadableAreasPanel(player));
+            panel.AddTabLine($"{mk.Color("Importer une sauvegarde", mk.Colors.Warning)}", _ => ImportAreaPanel(player));
 
             if (isCmd) panel.AddButton("Retour", _ => AAMenu.AAMenu.menu.AdminPluginPanel(player));
             panel.NextButton("Sélectionner", () => panel.SelectTab());
@@ -99,10 +98,14 @@ namespace Mapper
 
             //Corps
             panel.AddTabLine($"{mk.Color("Numéro du terrain", mk.Colors.Warning)}: {lifeArea.areaId}", _ => {});
-            panel.AddTabLine($"{mk.Color("Nombre d'objets", mk.Colors.Warning)}: {lifeArea.instance.objects.Count}", _ => {});
+            panel.AddTabLine($"{mk.Color("Nombre d'objets", mk.Colors.Warning)}: {Utils.GetAreaObjectsCount(lifeArea)}", _ => {});
 
-            panel.NextButton("Vider", () => ClearAreaPanel(player, lifeArea.areaId));
-            panel.NextButton("Voir les sauvegardes", () => ShowLoadableAreasPanel(player, lifeArea.areaId));
+            panel.NextButton($"{mk.Size($"{mk.Color("sauvegarder", mk.Colors.Info)}", 16)}", () => InitSaveAreaPanel(player));
+            panel.NextButton($"{mk.Size($"{mk.Color("Vos sauvegardes", mk.Colors.Success)}", 16)}", () => ShowLoadableAreasPanel(player, lifeArea.areaId));
+            
+            panel.NextButton($"{mk.Size($"{mk.Color("Vider", mk.Colors.Orange)}", 16)}", () => ClearAreaPanel(player, lifeArea.areaId));
+            panel.AddButton($"{mk.Size($"{mk.Color("prochaine fonctionnalité...", mk.Colors.Grey)}", 12)}", _ => {});
+
             panel.PreviousButton();
             panel.CloseButton();
 
@@ -117,18 +120,15 @@ namespace Mapper
             Panel panel = PanelHelper.Create($"Mapper - Vider le terrain n°{player.setup.areaId}", UIPanel.PanelType.Text, player, () => ClearAreaPanel(player, areaId));
 
             //Corps
-            panel.TextLines.Add("Êtes-vous sûr de vouloir vider ce terrain ?");
-            panel.TextLines.Add("L'ensemble des objets seront supprimés.");
+            panel.TextLines.Add($"{mk.Size("Êtes-vous sûr de vouloir vider ce terrain ?", 18)}");
+            panel.TextLines.Add("");
+            panel.TextLines.Add($"{mk.Size(mk.Color(mk.Bold("ATTENTION"), mk.Colors.Error), 18)}");
+            panel.TextLines.Add($"{mk.Size(mk.Color("L'ensemble des objets seront supprimés.", mk.Colors.Error), 18)}");
 
             panel.PreviousButton();
             panel.PreviousButtonWithAction("Confirmer", async () =>
             {
-                foreach (LifeObject i in lifeArea.instance.objects.Values.ToList())
-                {
-                    NetworkAreaHelper.RemoveObject(i.areaId, i.id);
-                }
-
-                if (lifeArea.instance.objects.Count == 0)
+                if (Utils.ClearArea(lifeArea, this))
                 {
                     player.Notify("Mapper", $"Terrain n°{lifeArea.areaId} vidé !", NotificationManager.Type.Success);
                     return await Task.FromResult(true);
@@ -230,7 +230,7 @@ namespace Mapper
             {
                 foreach (MapConfig mapConfig in mapConfigs)
                 {
-                    panel.AddTabLine($"{mapConfig.Name} - {mapConfig.Author}", _ => { });
+                    panel.AddTabLine($"{(mapConfig.MapId != Nova.mapId ? $"{mk.Color($"{mk.Italic("[incompatible]")}", mk.Colors.Error)}" : $"")} {mapConfig.Name} - {mapConfig.Author}", _ => { });
                 }
 
                 panel.NextButton("Exporter", () => ExportAreaPanel(player, mapConfigs[panel.selectedTab]));
@@ -245,24 +245,20 @@ namespace Mapper
         }
         public void LoadAreaPanel(Player player, MapConfig mapConfig)
         {
+            LifeArea lifeArea = Nova.a.GetAreaById((uint)mapConfig.AreaId);
+
             //Déclaration
             Panel panel = PanelHelper.Create($"Mapper - Terrain \"{mapConfig.Name}\"", UIPanel.PanelType.Text, player, () => LoadAreaPanel(player, mapConfig));
 
             //Corps
-            panel.TextLines.Add($"Voulez-vous charger ce terrain ?");
-            panel.TextLines.Add($"Attention, la décoration actuelle du terrain n°{mapConfig.AreaId} sera remplacée.");
-            panel.TextLines.Add($"Nombre d'objets: {mapConfig.ObjectCount}");
+            panel.TextLines.Add($"{mk.Size("Comment voulez-vous charger ce terrain ?", 18)}");
+            panel.TextLines.Add($"{mk.Size($"{mk.Color("Nombre d'objets :", mk.Colors.Purple)} {mapConfig.ObjectCount}", 18)}");
+            panel.TextLines.Add($"");
+            panel.TextLines.Add($"{mk.Size($"{mk.Align("   • Ajouter la décoration au terrain sans affecter l'existant.", mk.Aligns.Left)}", 14)}");
+            panel.TextLines.Add($"{mk.Size($"{mk.Align("   • Remplacer la décoration actuelle du terrain", mk.Aligns.Left)}", 14)}");
 
-            panel.AddButton("Téléportation", _ =>
+            panel.PreviousButtonWithAction("Ajouter", async () =>
             {
-                LifeArea area = Nova.a.GetAreaById((uint)mapConfig.AreaId);
-                player.setup.TargetSetPosition(area.instance.spawn);
-                panel.Refresh();
-            });
-            panel.AddButton("Supprimer", _ => DeleteAreaPanel(player, mapConfig));
-            panel.PreviousButtonWithAction("Charger", async () =>
-            {
-                Utils.ClearArea((uint)mapConfig.AreaId, this);
                 mapConfig.DeserializeObjects();
 
                 if (mapConfig.ListOfLifeObject != null && mapConfig.ListOfLifeObject.Count > 0)
@@ -271,13 +267,45 @@ namespace Mapper
                     {
                         var position = new Vector3(i.x, i.y, i.z);
                         Quaternion rotation = Utils.EulerToQuaternion(i.rotX, i.rotY, i.rotZ);
-                        NetworkAreaHelper.PlaceObject(i.areaId, i.objectId, i.objectId, position, rotation, i.isInterior, i.steamId, i.data);
+                        int modelId = Utils.GetModelId(i.objectVersion);
+                        NetworkAreaHelper.PlaceObject(i.areaId, i.objectId, modelId, position, rotation, i.isInterior, i.steamId, i.data);
                     }
                 }
 
                 player.Notify("Mapper", $"La décoration \"{mapConfig.Name}\" est chargée !", NotificationManager.Type.Success);
                 return await Task.FromResult(true);
             });
+            panel.PreviousButtonWithAction("Remplacer", async () =>
+            {
+                if (!Utils.ClearArea(lifeArea, this))
+                {
+                    player.Notify("Mapper", $"Erreur lors du nettoyage du terrain !", NotificationManager.Type.Error);
+                    return await Task.FromResult(false);
+                }
+
+                mapConfig.DeserializeObjects();
+
+                if (mapConfig.ListOfLifeObject != null && mapConfig.ListOfLifeObject.Count > 0)
+                {
+                    foreach (LifeObject i in mapConfig.ListOfLifeObject)
+                    {
+                        var position = new Vector3(i.x, i.y, i.z);
+                        Quaternion rotation = Utils.EulerToQuaternion(i.rotX, i.rotY, i.rotZ);
+                        int modelId = Utils.GetModelId(i.objectVersion);
+                        NetworkAreaHelper.PlaceObject(i.areaId, i.objectId, modelId, position, rotation, i.isInterior, i.steamId, i.data);
+                    }
+                }
+
+                player.Notify("Mapper", $"La décoration \"{mapConfig.Name}\" est chargée !", NotificationManager.Type.Success);
+                return await Task.FromResult(true);
+            });
+
+            panel.AddButton("Téléportation", _ =>
+            {
+                player.setup.TargetSetPosition(lifeArea.instance.spawn);
+                panel.Refresh();
+            });
+            panel.AddButton("Supprimer", _ => DeleteAreaPanel(player, mapConfig));
 
             panel.PreviousButton();
             panel.CloseButton();
@@ -289,7 +317,7 @@ namespace Mapper
         public void DeleteAreaPanel(Player player, MapConfig mapConfig)
         {
             //Déclaration
-            Panel panel = PanelHelper.Create($"Mapper - Supprimer le terrain \"{mapConfig.Name}\"", UIPanel.PanelType.Text, player, () => DeleteAreaPanel(player, mapConfig));
+            Panel panel = PanelHelper.Create($"Mapper - Supprimer la sauvegarde \"{mapConfig.Name}\"", UIPanel.PanelType.Text, player, () => DeleteAreaPanel(player, mapConfig));
 
             //Corps
             panel.TextLines.Add($"Voulez-vous vraiment supprimer cette sauvegarde ?");
@@ -380,13 +408,13 @@ namespace Mapper
 
                 panel.AddButton("Import", async _ =>
                 {
-                    string path = ConfigDirectoryPath + "/" + jsonFiles[panel.selectedTab] + ".json";
+                    string path = ConfigDirectoryPath + "/" + filesToImport[panel.selectedTab] + ".json";
                     if (File.Exists(path))
                     {
                         string jsonContent = File.ReadAllText(path);
                         MapConfig mapConfig = JsonConvert.DeserializeObject<MapConfig>(jsonContent);
                         mapConfig.DeserializeObjects();
-                        mapConfig.Source = jsonFiles[panel.selectedTab];
+                        mapConfig.Source = filesToImport[panel.selectedTab];
 
                         if (await mapConfig.Save()) player.Notify("Mapper", $"La décoration \"{mapConfig.Name}\" à bien été importée !", NotificationManager.Type.Success);
                         else player.Notify("Mapper", $"Échec de l'importation", NotificationManager.Type.Error);

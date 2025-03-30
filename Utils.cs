@@ -7,6 +7,9 @@ using System.Text.RegularExpressions;
 using UnityEngine;
 using Life.Network;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using Mirror;
+using Life.DB;
 
 namespace Mapper
 {
@@ -41,10 +44,16 @@ namespace Mapper
 
             mapConfig.CreatedAt = DateUtils.GetNumericalDateOfTheDay();
             mapConfig.AreaId = (int)player.setup.areaId;
-            mapConfig.ObjectCount = lifeArea.instance.objects.Count;
+            mapConfig.ObjectCount = GetAreaObjectsCount(lifeArea);
+            mapConfig.MapId = Nova.mapId;
             mapConfig.Source = "local";
 
             foreach (LifeObject i in lifeArea.instance.objects.Values)
+            {
+                mapConfig.ListOfLifeObject.Add(i);
+            }
+
+            foreach (LifeObject i in lifeArea.instance.spawnedObjects.Values)
             {
                 mapConfig.ListOfLifeObject.Add(i);
             }
@@ -54,19 +63,24 @@ namespace Mapper
             return mapConfig;
         }
 
-        public static bool ClearArea(uint areaId, ModKit.ModKit context)
+        public static bool ClearArea(LifeArea lifeArea, ModKit.ModKit context)
         {
-            LifeArea lifeArea = Nova.a.GetAreaById(areaId);
+            if (lifeArea?.instance == null) return false;
 
             foreach (LifeObject i in lifeArea.instance.objects.Values.ToList())
             {
                 context.NetworkAreaHelper.RemoveObject(i.areaId, i.id);
             }
+            foreach (LifeObject i in lifeArea.instance.spawnedObjects.Values.ToList())
+            {
+                LifeObject lifeObject = lifeArea.instance.spawnedObjects[i.netIdentity.netId];
+                NetworkServer.Destroy(NetworkServer.spawned[i.netIdentity.netId].gameObject);
+                LifeDB.RemoveObject(lifeObject.id);
+                lifeArea.instance.spawnedObjects.Remove(i.netIdentity.netId);
+            }
 
-            if (lifeArea.instance.objects.Count == 0) return true;
-            else return false;
+            return GetAreaObjectsCount(lifeArea) == 0;
         }
-
         public static bool IsValidMapName(string mapName)
         {
             return Regex.IsMatch(mapName, @"^[a-zA-Z0-9\s]+$");
@@ -89,6 +103,25 @@ namespace Mapper
             catch (JsonException)
             {
                 return false;
+            }
+        }
+
+        public static int GetAreaObjectsCount(LifeArea lifeArea)
+        {
+            return lifeArea.instance.objects.Count + lifeArea.instance.spawnedObjects.Count;
+        }
+
+        public static int GetModelId(string json)
+        {
+            try
+            {
+                JObject jsonObject = JsonConvert.DeserializeObject<JObject>(json);
+                int modelId = jsonObject["modelId"].Value<int>();
+                return modelId;
+            }
+            catch
+            {
+                return 0;
             }
         }
     }
