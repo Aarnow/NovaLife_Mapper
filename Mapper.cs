@@ -1,7 +1,9 @@
-﻿using Life;
+﻿using EVP;
+using Life;
 using Life.AreaSystem;
 using Life.Network;
 using Life.UI;
+using Mapper.Classes;
 using Mapper.Entities;
 using ModKit.Helper;
 using ModKit.Interfaces;
@@ -20,6 +22,9 @@ namespace Mapper
     public class Mapper : ModKit.ModKit
     {
         public static string ConfigDirectoryPath;
+        public static string JsonDirectoryPath;
+        public static string ConfigMapperPath;
+        public static MapperConfig _mapperConfig;
 
         public Mapper(IGameAPI api) : base(api)
         {
@@ -30,7 +35,9 @@ namespace Mapper
         {
             base.OnPluginInit();
 
-            GenerateDirectory();
+            InitConfigAndDirectory();
+            _mapperConfig = LoadConfigFile(ConfigMapperPath);
+
             GenerateCommands();
             InsertMenu();
 
@@ -38,7 +45,44 @@ namespace Mapper
 
             ModKit.Internal.Logger.LogSuccess($"{PluginInformations.SourceName} v{PluginInformations.Version}", "initialisé");
         }
+        #region Config
+        private void InitConfigAndDirectory()
+        {
+            try
+            {
+                ConfigDirectoryPath = DirectoryPath + "/Mapper";
+                ConfigMapperPath = Path.Combine(ConfigDirectoryPath, "MapperConfig.json");
+                JsonDirectoryPath = ConfigDirectoryPath + "/Partage";
 
+                if (!Directory.Exists(ConfigDirectoryPath)) Directory.CreateDirectory(ConfigDirectoryPath);
+                if (!Directory.Exists(JsonDirectoryPath)) Directory.CreateDirectory(JsonDirectoryPath);
+                if (!File.Exists(ConfigMapperPath)) InitMapperConfig();
+            }
+            catch (IOException ex)
+            {
+                ModKit.Internal.Logger.LogError("InitDirectory", ex.Message);
+            }
+        }
+
+        private void InitMapperConfig()
+        {
+            MapperConfig mapperConfig = new MapperConfig();
+            string json = JsonConvert.SerializeObject(mapperConfig);
+            File.WriteAllText(ConfigMapperPath, json);
+        }
+
+        private MapperConfig LoadConfigFile(string path)
+        {
+            if (File.Exists(path))
+            {
+                string jsonContent = File.ReadAllText(path);
+                MapperConfig mapperConfig = JsonConvert.DeserializeObject<MapperConfig>(jsonContent);
+
+                return mapperConfig;
+            }
+            else return null;
+        }
+        #endregion
         public void InsertMenu()
         {
             _menu.AddAdminPluginTabLine(PluginInformations, 1, "Mapper", (ui) =>
@@ -46,19 +90,6 @@ namespace Mapper
                 Player player = PanelHelper.ReturnPlayerFromPanel(ui);
                 MapperPanel(player, true);
             }, 0);
-        }
-        private void GenerateDirectory()
-        {
-            try
-            {
-                ConfigDirectoryPath = DirectoryPath + "/Mapper";
-
-                if (!Directory.Exists(ConfigDirectoryPath)) Directory.CreateDirectory(ConfigDirectoryPath);
-            }
-            catch (IOException ex)
-            {
-                ModKit.Internal.Logger.LogError("InitDirectory", ex.Message);
-            }
         }
         public void GenerateCommands()
         {
@@ -78,6 +109,11 @@ namespace Mapper
             panel.AddTabLine($"{mk.Color("Terrain actuel", mk.Colors.Verbose)}", _ => CheckAreaPanel(player));
             panel.AddTabLine($"{mk.Color("Vos sauvegardes", mk.Colors.Verbose)}", _ => ShowLoadableAreasPanel(player));
             panel.AddTabLine($"{mk.Color("Importer une sauvegarde", mk.Colors.Warning)}", _ => ImportAreaPanel(player));
+            panel.AddTabLine($"{mk.Color("Appliquer la configuration", mk.Colors.Info)}", _ =>
+            {
+                _mapperConfig = LoadConfigFile(ConfigMapperPath);
+                panel.Refresh();
+            });
 
             if (isCmd) panel.AddButton("Retour", _ => AAMenu.AAMenu.menu.AdminPluginPanel(player));
             panel.NextButton("Sélectionner", () => panel.SelectTab());
@@ -259,45 +295,41 @@ namespace Mapper
 
             panel.PreviousButtonWithAction("Ajouter", async () =>
             {
-                mapConfig.DeserializeObjects();
+                float time = Utils.GetLoadTime(mapConfig);
+                player.Notify("Mapper", $"La décoration \"{mapConfig.Name}\" est en cours de chargement (environ {time} secondes) !", NotificationManager.Type.Success, 5); 
 
-                if (mapConfig.ListOfLifeObject != null && mapConfig.ListOfLifeObject.Count > 0)
+                if (await Utils.LoadArea(mapConfig, this))
                 {
-                    foreach (LifeObject i in mapConfig.ListOfLifeObject)
-                    {
-                        var position = new Vector3(i.x, i.y, i.z);
-                        Quaternion rotation = Utils.EulerToQuaternion(i.rotX, i.rotY, i.rotZ);
-                        int modelId = Utils.GetModelId(i.objectVersion);
-                        NetworkAreaHelper.PlaceObject(i.areaId, i.objectId, modelId, position, rotation, i.isInterior, i.steamId, i.data);
-                    }
+                    player.Notify("Mapper", $"La décoration \"{mapConfig.Name}\" est chargée !", NotificationManager.Type.Success);
+                    return await Task.FromResult(true);
                 }
-
-                player.Notify("Mapper", $"La décoration \"{mapConfig.Name}\" est chargée !", NotificationManager.Type.Success);
-                return await Task.FromResult(true);
+                else
+                {
+                    player.Notify("Mapper", $"Échec du chargement de la décoration {mapConfig.Name}", NotificationManager.Type.Error);
+                    return await Task.FromResult(false);
+                }
             });
             panel.PreviousButtonWithAction("Remplacer", async () =>
             {
+                float time = Utils.GetLoadTime(mapConfig);
+
+                player.Notify("Mapper", $"La décoration \"{mapConfig.Name}\" est en cours de chargement (environ {time} secondes) !", NotificationManager.Type.Success, 5);
                 if (!Utils.ClearArea(lifeArea, this))
                 {
                     player.Notify("Mapper", $"Erreur lors du nettoyage du terrain !", NotificationManager.Type.Error);
                     return await Task.FromResult(false);
                 }
 
-                mapConfig.DeserializeObjects();
-
-                if (mapConfig.ListOfLifeObject != null && mapConfig.ListOfLifeObject.Count > 0)
+                if (await Utils.LoadArea(mapConfig, this))
                 {
-                    foreach (LifeObject i in mapConfig.ListOfLifeObject)
-                    {
-                        var position = new Vector3(i.x, i.y, i.z);
-                        Quaternion rotation = Utils.EulerToQuaternion(i.rotX, i.rotY, i.rotZ);
-                        int modelId = Utils.GetModelId(i.objectVersion);
-                        NetworkAreaHelper.PlaceObject(i.areaId, i.objectId, modelId, position, rotation, i.isInterior, i.steamId, i.data);
-                    }
+                    player.Notify("Mapper", $"La décoration \"{mapConfig.Name}\" est chargée !", NotificationManager.Type.Success);
+                    return await Task.FromResult(true);
                 }
-
-                player.Notify("Mapper", $"La décoration \"{mapConfig.Name}\" est chargée !", NotificationManager.Type.Success);
-                return await Task.FromResult(true);
+                else
+                {
+                    player.Notify("Mapper", $"Échec du chargement de la décoration {mapConfig.Name}", NotificationManager.Type.Error);
+                    return await Task.FromResult(false);
+                }
             });
 
             panel.AddButton("Téléportation", _ =>
@@ -348,7 +380,7 @@ namespace Mapper
         public void ExportAreaPanel(Player player, MapConfig mapConfig)
         {
             string fileName = Utils.FormatMapName(mapConfig.Name) + $"-{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}.json";
-            string NewMapPath = Path.Combine(ConfigDirectoryPath, fileName);
+            string NewMapPath = Path.Combine(JsonDirectoryPath, fileName);
 
             string json = JsonConvert.SerializeObject(mapConfig);
             
@@ -391,7 +423,7 @@ namespace Mapper
 
         public async void ImportAreaPanel(Player player)
         {
-            string[] jsonFiles = Directory.GetFiles(ConfigDirectoryPath, "*.json").Select(Path.GetFileNameWithoutExtension).ToArray();
+            string[] jsonFiles = Directory.GetFiles(JsonDirectoryPath, "*.json").Select(Path.GetFileNameWithoutExtension).ToArray();
             List<MapConfig> mapConfigs = await MapConfig.QueryAll();
             List<string> filesToImport = jsonFiles.Where(fileName => !mapConfigs.Any(config => string.Equals(config.Source, fileName, StringComparison.OrdinalIgnoreCase))).ToList();
 
@@ -408,7 +440,7 @@ namespace Mapper
 
                 panel.AddButton("Import", async _ =>
                 {
-                    string path = ConfigDirectoryPath + "/" + filesToImport[panel.selectedTab] + ".json";
+                    string path = JsonDirectoryPath + "/" + filesToImport[panel.selectedTab] + ".json";
                     if (File.Exists(path))
                     {
                         string jsonContent = File.ReadAllText(path);
