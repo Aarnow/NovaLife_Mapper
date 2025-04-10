@@ -10,6 +10,9 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Mirror;
 using Life.DB;
+using ModKit.Helper.ManagerHelper;
+using System.Threading.Tasks;
+using Mapper.Classes;
 
 namespace Mapper
 {
@@ -62,7 +65,6 @@ namespace Mapper
 
             return mapConfig;
         }
-
         public static bool ClearArea(LifeArea lifeArea, ModKit.ModKit context)
         {
             if (lifeArea?.instance == null) return false;
@@ -80,6 +82,29 @@ namespace Mapper
             }
 
             return GetAreaObjectsCount(lifeArea) == 0;
+        }
+
+        public static async Task<bool> LoadArea(MapConfig mapConfig, ModKit.ModKit context)
+        {
+            if (mapConfig == null) return false;
+
+            mapConfig.DeserializeObjects();
+            if (mapConfig.ListOfLifeObject != null && mapConfig.ListOfLifeObject.Count > 0)
+            {
+                bool useSmoothing = Mapper._mapperConfig.EnableSmoothing && mapConfig.ListOfLifeObject.Count >= Mapper._mapperConfig.MinObjectsForSmoothing;
+
+                foreach (LifeObject i in mapConfig.ListOfLifeObject)
+                {
+                    var position = new Vector3(i.x, i.y, i.z);
+                    Quaternion rotation = EulerToQuaternion(i.rotX, i.rotY, i.rotZ);
+                    int modelId = GetModelId(i.objectVersion);
+
+                    context.NetworkAreaHelper.PlaceObject(i.areaId, i.objectId, modelId, position, rotation, i.isInterior, i.steamId, i.data);
+
+                    if (useSmoothing) await Task.Delay(Mapper._mapperConfig.SmoothingDelayMs);
+                }
+            }
+            return true;
         }
         public static bool IsValidMapName(string mapName)
         {
@@ -123,6 +148,10 @@ namespace Mapper
             {
                 return 0;
             }
+        }
+        public static float GetLoadTime(MapConfig mapConfig)
+        {
+            return Mathf.Round((mapConfig.ObjectCount * Mapper._mapperConfig.SmoothingDelayMs) / 1000);
         }
     }
 }
